@@ -14,6 +14,7 @@ import win32api
 import sqlite3
 from sqlite3 import Error
 
+#===GIT test====
 #======== GLOBAL PART ====================
 api_key = '44e7juYXhwCKodvroDRlEzJ4sL4ZjFPL5PFphtSCL2sth8szLphpjfZjaPFoKG7T'
 api_secret = 'DUKrNGTgfAniKxTO9VjcjjRviPlxrDLTtvj9uRxtce0wvbWW61hcGF3THHyz0u8e'
