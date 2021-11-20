@@ -14,22 +14,31 @@ import win32api
 import sqlite3
 from sqlite3 import Error
 
-#===GIT test====
 #======== GLOBAL PART ====================
+#======== load settings from file =======
+settings_file=open("settings")
+settings_data=json.load(settings_file)
+settings_file.close()
+
 api_key = '44e7juYXhwCKodvroDRlEzJ4sL4ZjFPL5PFphtSCL2sth8szLphpjfZjaPFoKG7T'
 api_secret = 'DUKrNGTgfAniKxTO9VjcjjRviPlxrDLTtvj9uRxtce0wvbWW61hcGF3THHyz0u8e'
 client = Client(api_key, api_secret)
+session_start_time=settings_data['asian_session_start'] #start time in MSK timezone of trade session (Asia/Europe/US)
+sample_period=int(settings_data['update_period']) #sample period in seconds
 
-
+#======= sync time vs. Binance (must run as admin/root)=========
 gt = client.get_server_time()
 tt=time.gmtime(int((gt["serverTime"])/1000))
 win32api.SetSystemTime(tt[0],tt[1],0,tt[2],tt[3],tt[4],tt[5],0)
 
 info_file=open("info_file.txt",mode="w")
 
+#======== get exchange rates =======
 try: all_tickers_info = client.get_all_tickers()
 except BinanceAPIException as e:
     print("API get_account_snapshot: ",e)
+info_file.write('\n====all_tickers_info======:\n'+str(all_tickers_info))
+info_file.close()
 
 #============= SQLITE connection =================
 def create_connection(db_file):
@@ -68,7 +77,7 @@ def add_balance(conn, balance_data):
     :param balance_data:
     :return: last row id
     """
-    sql = 'INSERT INTO balance(user_id,date,balance_source,USDT_balance) VALUES(?,?,?,?)'
+    sql = 'INSERT INTO balance(user_id,date,time,balance_source,USDT_balance) VALUES(?,?,?,?,?)'
     cur = conn.cursor()
     cur.execute(sql, balance_data)
     conn.commit()
@@ -137,7 +146,7 @@ def get_acc_snapshot(type_name):
     if total_usdt>0: print('total_usdt=%f' %(total_usdt))
     return total_usdt
 #============= get futures account =============
-def get_futures():
+def get_futures_USD_M():
     futures_acc_info=[]
     try: futures_acc_info = client.futures_account()
     except BinanceAPIException as e:
@@ -149,7 +158,7 @@ def get_futures():
     return futures_acc_balance
 
 #============= get futures coin account =============
-def get_futures_coin():
+def get_futures_coin_M():
     futures_coin_acc_info=[]
     total_usdt=0
     try: futures_coin_acc_info = client.futures_coin_account()
@@ -182,7 +191,6 @@ def get_futures_acc_balance():
 # ================= MAIN =====================
 def main():
     user_id='u_'+api_key[-5:]
-    cur_time=time.strftime('%Y%m%d_%H%M')
 
     database = r"c:\my_python\python-binance-master\Alex\pythonsqlite.db"
     # create a database connection
@@ -191,6 +199,8 @@ def main():
     sql_create_main_table = """ CREATE TABLE IF NOT EXISTS balance (
                                         user_id text,
                                         date text,
+                                        time text,
+                                        time_label text,
                                         balance_source text NOT NULL,
                                         USDT_balance real
                                     ); """
@@ -201,38 +211,46 @@ def main():
     else:
         print("Error! cannot create the database connection.")
     
+    while loop_status!='exit_loop':
+        total_usdt=0.0
+        cur_date=time.strftime('%Y%m%d')
+        cur_time=time.strftime('%H%M')
+        time_label='asian_session_start'
 
-    try: my_margin_acc=client.get_margin_account()
-    except BinanceAPIException as e:
-        print("API get_margin_account: ",e)
-    try: balance_BTC = client.get_asset_balance(asset='BTC')
-    except BinanceAPIException as e:
-        print("API get_asset_balance: ",e)
-    try: asset_details = client.get_asset_details()
-    except BinanceAPIException as e:
-        print("API get_asset_details: ",e)
-    try: exchange_info = client.get_exchange_info()
-    except BinanceAPIException as e:
-        print("API get_exchange_info: ",e)
+        info_file=open("info_file.txt",mode="w")
+        
+        try: my_margin_acc=client.get_margin_account()
+        except BinanceAPIException as e:
+            print("API get_margin_account: ",e)
+        try: balance_BTC = client.get_asset_balance(asset='BTC')
+        except BinanceAPIException as e:
+            print("API get_asset_balance: ",e)
+        try: asset_details = client.get_asset_details()
+        except BinanceAPIException as e:
+            print("API get_asset_details: ",e)
+        try: exchange_info = client.get_exchange_info()
+        except BinanceAPIException as e:
+            print("API get_exchange_info: ",e)
 
-    #info_file.write(str(all_tickers_info)+'\n')
-    #info_file.write(str(acc_info)+'\n')
+        #info_file.write(str(all_tickers_info)+'\n')
+        #info_file.write(str(acc_info)+'\n')
 
-    # get_acc()
-    # get_acc_snapshot('SPOT')
-    # get_acc_snapshot('MARGIN')
-    # get_acc_snapshot('FUTURES')
-    # get_futures()
-    # get_futures_coin()
-    # get_futures_acc_balance()
+        # get_acc()
+        # get_acc_snapshot('SPOT')
+        # get_acc_snapshot('MARGIN')
+        # get_acc_snapshot('FUTURES')
+        total_usdt += get_futures_USD_M()
+        total_usdt += get_futures_coin_M()
+        # get_futures_acc_balance()
 
-    with conn:
-        # insert new balance
-        balance_futures_coin = (user_id, cur_time,'get_futures_coin',get_futures_coin());
-        balance_futures_usd_m = (user_id, cur_time,'get_futures',get_futures());
-        balance_id = add_balance(conn, balance_futures_coin)
-        balance_id = add_balance(conn, balance_futures_usd_m)
-    info_file.close()
+        with conn:
+            # insert new balance into table
+            balance_total_futures = (user_id, cur_date, cur_time,time_label,'total_futures_usdt',total_usdt)
+            balance_id = add_balance(conn, balance_total_futures)
+        
+        info_file.close()
+        time.sleep(sample_period)
 
+#======= MAIN execution===========
 if __name__ == "__main__":
     main()
