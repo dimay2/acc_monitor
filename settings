@@ -1,0 +1,6 @@
+{
+	"asian_session_start":"0200",
+	"europe_session_start":"0800",
+	"us_session_start":"1600",
+	"update_period":"180"
+}
