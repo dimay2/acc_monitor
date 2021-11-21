@@ -77,11 +77,18 @@ def add_balance(conn, balance_data):
     :param balance_data:
     :return: last row id
     """
-    sql = 'INSERT INTO balance(user_id,date,time,balance_source,USDT_balance) VALUES(?,?,?,?,?)'
+    sql = 'INSERT INTO balance(user_id,date,time,time_label,balance_source,USDT_balance) VALUES(?,?,?,?,?,?)'
     cur = conn.cursor()
     cur.execute(sql, balance_data)
     conn.commit()
     return cur.lastrowid
+
+#============= SQLITE find user start session entries =================
+def fetch_user_balance(conn, user_id, date, time_label):
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM balance WHERE user_id=? AND date=? AND time_label=?', (user_id,date,time_label))
+    row=cur.fetchall()
+    return row
 
 #============= get_sudt_rate =============
 def get_usdt_rate(usdt_pair):
@@ -147,35 +154,35 @@ def get_acc_snapshot(type_name):
     return total_usdt
 #============= get futures account =============
 def get_futures_USD_M():
-    futures_acc_info=[]
-    try: futures_acc_info = client.futures_account()
+    futures_USD_M=[]
+    try: futures_USD_M = client.futures_account()
     except BinanceAPIException as e:
         print("API futures_account: ",e)
-        return
-    futures_acc_balance=float(futures_acc_info['totalWalletBalance'])
-    info_file.write('\n====futures_acc_info======:\n'+str(futures_acc_info))
-    if futures_acc_balance>0: print('futures_acc_info: futures_acc_balance=%f USD' %(futures_acc_balance))
+        return 0.00
+    futures_acc_balance=float(futures_USD_M['totalWalletBalance'])
+    info_file.write('\n====futures_USD_M======:\n'+str(futures_USD_M))
+    if futures_acc_balance>0: print('futures_USD_M: futures_acc_balance=%f USD' %(futures_acc_balance))
     return futures_acc_balance
 
 #============= get futures coin account =============
 def get_futures_coin_M():
-    futures_coin_acc_info=[]
-    total_usdt=0
-    try: futures_coin_acc_info = client.futures_coin_account()
+    futures_coin_M=[]
+    total_usdt=0.00
+    try: futures_coin_M = client.futures_coin_account()
     except BinanceAPIException as e:
         print("API futures_coin_account: ",e)
-        return
-    for i in range(len(futures_coin_acc_info['assets'])):
-        coin=futures_coin_acc_info['assets'][i]['asset']
-        walletBalance=float(futures_coin_acc_info['assets'][i]['walletBalance'])
+        return 0.00
+    for i in range(len(futures_coin_M['assets'])):
+        coin=futures_coin_M['assets'][i]['asset']
+        walletBalance=float(futures_coin_M['assets'][i]['walletBalance'])
         if float(walletBalance)>0:
             usdt_pair=coin+'USDT'
             usdt_rate=float(get_usdt_rate(usdt_pair))
             usdt_coin_value=walletBalance*usdt_rate
-            total_usdt+=usdt_coin_value
-            print('futures_coin_acc_info: coin=%s walletBalance=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%s' %(coin,walletBalance,usdt_pair,usdt_rate,usdt_coin_value))
+            total_usdt+=float(usdt_coin_value)
+            print('futures_coin_M: coin=%s walletBalance=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%s' %(coin,walletBalance,usdt_pair,usdt_rate,usdt_coin_value))
     
-    info_file.write('\n====futures_coin_acc_info======:\n'+str(futures_coin_acc_info))
+    info_file.write('\n====futures_coin_M======:\n'+str(futures_coin_M))
     if total_usdt>0: print('total_usdt=%f' %(total_usdt))
     return total_usdt
 
@@ -190,8 +197,9 @@ def get_futures_acc_balance():
 
 # ================= MAIN =====================
 def main():
+    global info_file
     user_id='u_'+api_key[-5:]
-
+    loop_status='continue'
     database = r"c:\my_python\python-binance-master\Alex\pythonsqlite.db"
     # create a database connection
     conn = create_connection(database)
@@ -213,9 +221,9 @@ def main():
     
     while loop_status!='exit_loop':
         total_usdt=0.0
-        cur_date=time.strftime('%Y%m%d')
-        cur_time=time.strftime('%H%M')
-        time_label='asian_session_start'
+        cur_date=time.strftime('%Y-%m-%d')
+        cur_time=time.strftime('%H:%M')
+        time_label=''
 
         info_file=open("info_file.txt",mode="w")
         
@@ -244,12 +252,19 @@ def main():
         # get_futures_acc_balance()
 
         with conn:
-            # insert new balance into table
-            balance_total_futures = (user_id, cur_date, cur_time,time_label,'total_futures_usdt',total_usdt)
-            balance_id = add_balance(conn, balance_total_futures)
-        
+            time_label='asian_session_start'
+            asian_start_entries=fetch_user_balance(conn,user_id,cur_date,time_label)
+            if len(asian_start_entries)<1 and cur_time>=settings_data[time_label]:
+                #no asian session start entries yet for this date
+                balance_total_futures = (user_id, cur_date, cur_time,time_label,'total_futures_usdt',total_usdt)
+                balance_id = add_balance(conn, balance_total_futures)
+            else:
+                balance_total_futures = (user_id, cur_date, cur_time,'regular_sample','total_futures_usdt',total_usdt)
+                balance_id = add_balance(conn, balance_total_futures)
+
         info_file.close()
-        time.sleep(sample_period)
+        loop_status='exit_loop'
+        # time.sleep(sample_period)
 
 #======= MAIN execution===========
 if __name__ == "__main__":
