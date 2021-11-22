@@ -27,6 +27,7 @@ session_start_time=settings_data['asian_session_start'] #start time in MSK timez
 sample_period=int(settings_data['update_period']) #sample period in seconds
 
 #======= sync time vs. Binance (must run as admin/root)=========
+os.system('w32tm /resync')
 gt = client.get_server_time()
 tt=time.gmtime(int((gt["serverTime"])/1000))
 win32api.SetSystemTime(tt[0],tt[1],0,tt[2],tt[3],tt[4],tt[5],0)
@@ -37,6 +38,7 @@ info_file=open("info_file.txt",mode="w")
 try: all_tickers_info = client.get_all_tickers()
 except BinanceAPIException as e:
     print("API get_account_snapshot: ",e)
+    exit()
 info_file.write('\n====all_tickers_info======:\n'+str(all_tickers_info))
 info_file.close()
 
@@ -53,7 +55,7 @@ def create_connection(db_file):
         return conn
     except Error as e:
         print(e)
-    
+        exit()
     return conn
 
 #============= SQLITE create table=================
@@ -68,7 +70,7 @@ def create_table(conn, create_table_sql):
         c.execute(create_table_sql)
     except Error as e:
         print(e)
-
+        exit()
 #============= SQLITE insert balance data =================
 def add_balance(conn, balance_data):
     """
@@ -90,6 +92,34 @@ def fetch_user_balance(conn, user_id, date, time_label):
     row=cur.fetchall()
     return row
 
+#============= SQLITE find start session USDT difference =================
+def fetch_user_usdt_diff(conn, user_id, time_label, diff_type):
+    # diff_type = 'diff_since_last_monday' | 'diff_since_start_of_month' | 'diff_since_start_of_day'
+    cur = conn.cursor()
+    
+    if diff_type=='diff_since_start_of_day':
+        sql="""  select a.USDT_balance-b.USDT_balance from 
+                    (select USDT_balance from balance where user_id=? and date=date('now') group by user_id having rowid=max(rowid) order by time asc) a,
+                    (select USDT_balance from balance where date=date('now') and user_id=? and time_label=?) b
+            """
+    elif diff_type=='diff_since_last_monday':
+        sql="""  select a.USDT_balance-b.USDT_balance from 
+                    (select USDT_balance from balance where user_id=? and date=date('now') group by user_id having rowid=max(rowid) order by time asc) a,
+                    (select USDT_balance from balance where date=date('now','weekday 1') and user_id=? and time_label=?) b
+            """
+    elif diff_type=='diff_since_start_of_month':
+        sql="""  select a.USDT_balance-b.USDT_balance from 
+                    (select USDT_balance from balance where user_id=? and date=date('now') group by user_id having rowid=max(rowid) order by time asc) a,
+                    (select USDT_balance from balance where date=date('now','start of month') and user_id=? and time_label=?) b
+            """
+    cur.execute(sql,(user_id,user_id,time_label))
+    row=cur.fetchone()
+    if row:
+        USDT_balance_diff=float(row[0])
+        return USDT_balance_diff
+    else:
+        return 0.00
+
 #============= get_sudt_rate =============
 def get_usdt_rate(usdt_pair):
     if usdt_pair!='USDTUSDT':
@@ -107,7 +137,7 @@ def get_acc():
     try: acc_info = client.get_account()
     except BinanceAPIException as e:
         print("API get_account: ",e)
-        return
+        return -1
     for i in range(len(acc_info['balances'])):
         coin=acc_info['balances'][i]['asset']
         free=acc_info['balances'][i]['free']
@@ -127,7 +157,7 @@ def get_acc_snapshot(type_name):
     try: acc_snap_spot = client.get_account_snapshot(type=type_name)
     except BinanceAPIException as e:
         print("API get_account_snapshot_spot: ",e)
-        return
+        return -1
     if type_name=='SPOT':
         acc_snap_spot_balances=acc_snap_spot['snapshotVos'][0]['data']['balances']
     elif type_name=='MARGIN':
@@ -158,7 +188,7 @@ def get_futures_USD_M():
     try: futures_USD_M = client.futures_account()
     except BinanceAPIException as e:
         print("API futures_account: ",e)
-        return 0.00
+        return -1
     futures_acc_balance=float(futures_USD_M['totalWalletBalance'])
     info_file.write('\n====futures_USD_M======:\n'+str(futures_USD_M))
     if futures_acc_balance>0: print('futures_USD_M: futures_acc_balance=%f USD' %(futures_acc_balance))
@@ -171,7 +201,7 @@ def get_futures_coin_M():
     try: futures_coin_M = client.futures_coin_account()
     except BinanceAPIException as e:
         print("API futures_coin_account: ",e)
-        return 0.00
+        return -1
     for i in range(len(futures_coin_M['assets'])):
         coin=futures_coin_M['assets'][i]['asset']
         walletBalance=float(futures_coin_M['assets'][i]['walletBalance'])
@@ -192,7 +222,7 @@ def get_futures_acc_balance():
     try: futures_acc_balance = client.futures_account_balance()
     except BinanceAPIException as e:
         print("API futures_coin_account: ",e)
-        return
+        return -1
     info_file.write('\n====futures_acc_balance======:\n'+str(futures_acc_balance))
 
 # ================= MAIN =====================
@@ -230,15 +260,19 @@ def main():
         try: my_margin_acc=client.get_margin_account()
         except BinanceAPIException as e:
             print("API get_margin_account: ",e)
+            continue
         try: balance_BTC = client.get_asset_balance(asset='BTC')
         except BinanceAPIException as e:
             print("API get_asset_balance: ",e)
+            continue
         try: asset_details = client.get_asset_details()
         except BinanceAPIException as e:
             print("API get_asset_details: ",e)
+            continue
         try: exchange_info = client.get_exchange_info()
         except BinanceAPIException as e:
             print("API get_exchange_info: ",e)
+            continue
 
         #info_file.write(str(all_tickers_info)+'\n')
         #info_file.write(str(acc_info)+'\n')
@@ -247,20 +281,30 @@ def main():
         # get_acc_snapshot('SPOT')
         # get_acc_snapshot('MARGIN')
         # get_acc_snapshot('FUTURES')
-        total_usdt += get_futures_USD_M()
-        total_usdt += get_futures_coin_M()
+        futures_usdt_M=get_futures_USD_M()
+        if futures_usdt_M<0: continue
+        futures_coin_M=get_futures_coin_M()
+        if futures_coin_M<0: continue
+
+        total_usdt += futures_usdt_M
+        total_usdt += futures_coin_M
         # get_futures_acc_balance()
 
         with conn:
             time_label='asian_session_start'
-            asian_start_entries=fetch_user_balance(conn,user_id,cur_date,time_label)
-            if len(asian_start_entries)<1 and cur_time>=settings_data[time_label]:
+            # time_label='us_session_start'
+            session_start_entries=fetch_user_balance(conn,user_id,cur_date,time_label)
+            if len(session_start_entries)<1 and cur_time>=settings_data[time_label]:
                 #no asian session start entries yet for this date
                 balance_total_futures = (user_id, cur_date, cur_time,time_label,'total_futures_usdt',total_usdt)
                 balance_id = add_balance(conn, balance_total_futures)
             else:
                 balance_total_futures = (user_id, cur_date, cur_time,'regular_sample','total_futures_usdt',total_usdt)
                 balance_id = add_balance(conn, balance_total_futures)
+
+        usdt_diff_since_start_of_day=fetch_user_usdt_diff(conn,user_id,time_label,'diff_since_start_of_day')
+        usdt_diff_since_start_of_month=fetch_user_usdt_diff(conn,user_id,time_label,'diff_since_start_of_month')
+        usdt_diff_since_last_monday=fetch_user_usdt_diff(conn,user_id,time_label,'diff_since_last_monday')
 
         info_file.close()
         loop_status='exit_loop'
