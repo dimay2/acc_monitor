@@ -3,16 +3,32 @@ from datetime import datetime
 from binance.exceptions import *
 from binance.enums import *
 from collections import deque
+from pyasn1.type.univ import Null
 import tzlocal  # $ pip install tzlocal
 import numpy as np 
 import json
 import os
 import sys
 import io
+# import timepython Scripts/pywin32_postinstall.py -install
 import time
 import win32api
 import sqlite3
 from sqlite3 import Error
+import telebot
+from telethon.sync import TelegramClient
+from telethon.tl.types import InputPeerUser, InputPeerChannel, UpdateFavedStickers
+from telethon import TelegramClient, sync, events
+
+from telegram import Update, update
+from telegram import Bot
+from telegram.ext import CallbackContext
+from telegram.ext import Updater
+from telegram.ext import Filters
+from telegram.ext import MessageHandler
+from telegram.ext import CommandHandler
+import requests
+from telegram.ext.dispatcher import run_async
 
 #======== GLOBAL PART ====================
 #======== load settings from file =======
@@ -20,13 +36,30 @@ settings_file=open("settings")
 settings_data=json.load(settings_file)
 settings_file.close()
 
+callbackcontext_1=CallbackContext
+updater_1=Updater
+chat_id_1=0
+telegram_user_name_1=''
+bot_1=Bot
+telegram_users={}
+
 api_key = '44e7juYXhwCKodvroDRlEzJ4sL4ZjFPL5PFphtSCL2sth8szLphpjfZjaPFoKG7T'
 api_secret = 'DUKrNGTgfAniKxTO9VjcjjRviPlxrDLTtvj9uRxtce0wvbWW61hcGF3THHyz0u8e'
 client = Client(api_key, api_secret)
+user_id=''
 session_start_time=settings_data['asian_session_start'] #start time in MSK timezone of trade session (Asia/Europe/US)
 sample_period=int(settings_data['update_period']) #sample period in seconds
+usdt_daily_diff_thres=float(settings_data['usdt_daily_diff_thres']) #USDT difference since start of day session
+usdt_month_start_diff_thres=float(settings_data['usdt_month_start_diff_thres']) #USDT difference since start of month session
+usdt_week_start_thres=float(settings_data['usdt_week_start_thres']) #USDT difference since start of week (last Mon) session
+
+api_id = '14490370'
+api_hash = 'eefa159a84be87ac5087ff1586ad4e56'
+bot_token = '2145626803:AAF3zhXeME5P6oVQiVbxi1VIkhIfdgPFiJU'
+group_username = 'ddd2test_bot'
 
 #======= sync time vs. Binance (must run as admin/root)=========
+os.system('net start w32time')
 os.system('w32tm /resync')
 gt = client.get_server_time()
 tt=time.gmtime(int((gt["serverTime"])/1000))
@@ -41,6 +74,117 @@ except BinanceAPIException as e:
     exit()
 info_file.write('\n====all_tickers_info======:\n'+str(all_tickers_info))
 info_file.close()
+
+#============= Telegram bot=================
+def message_handler(update: Update, context: CallbackContext):
+    update.message.reply_text(text='Text for example',)
+
+def hello(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(f'Hello {update.effective_user.first_name}')
+
+# def do_start(bot: Bot, update: Update):
+def do_start(update: Update, callbackcontext: CallbackContext):
+    global callbackcontext_1
+    global chat_id_1
+    global telegram_user_name_1
+    global updater_1
+    global bot_1
+    global telegram_users
+
+    updater_1=update
+    chat_id_1=update.message.chat_id
+    telegram_user_name_1=update.message.chat.username
+    # member=update.message.chat.get_member(user_name)
+    callbackcontext_1=callbackcontext
+    bot_1=callbackcontext_1.bot
+    # chatmember=callbackcontext.bot.getChatMember()
+    message_text='your chat_id=%d' %chat_id_1
+    telegram_users[telegram_user_name_1]=chat_id_1
+    # callbackcontext.bot.send_message(chat_id=update.message.chat_id, text=message_text)
+    # print(chatmember)
+
+# def do_echo(bot: Bot, update: Update):
+def do_echo(update: Update, callbackcontext: CallbackContext):
+    text = update.message.text
+    callbackcontext.bot.sendMessage(chat_id=update.message.chat_id, text=text)
+
+def start(bot, update):
+    # print('json file update : ' ,update)
+    # print("json file bot : ', bot)
+    chat_id = update.message.chat_id
+    first_name = update.message.chat.first_name
+    last_name = update.message.chat.last_name
+    username = update.message.chat.username
+    print("chat_id : {} and firstname : {} lastname : {}  username {}". format(chat_id, first_name, last_name , username))
+    bot.sendMessage(chat_id, 'text')
+
+def telegram_handler(updater):
+    global chat_id_1
+    global bot_token
+    global telegram_users
+    global telegram_user_name_1
+    global user_id
+
+    # start_handler=CommandHandler('start', do_start, run_async=True)
+    start_handler=CommandHandler('start', do_start)
+    # message_handler_2=MessageHandler(Filters.text, do_echo)
+    updater.dispatcher.add_handler(start_handler)
+    # updater.dispatcher.add_handler(message_handler_2)
+
+    # print(updater.bot.get_me())
+    # updater.dispatcher.add_handler(MessageHandler(filters=Filters.all, callback=message_handler))
+    updater.start_polling(poll_interval=10)
+    # callbackcontext_1.bot.send_message(chat_id_1, text='DO_START AAAAAAAAAA')
+    # updater.idle()
+    return updater
+
+def send_to_telegram(message):
+    # get your api_id, api_hash, token
+    # from telegram as described above
+    message2 = "Working..."
+    firstname =[]
+    lastname = []
+    username = []
+
+
+    # your phone number
+    phone = '+79152897767'
+    # creating a telegram session and assigning
+    # it to a variable client
+    client = TelegramClient('session', api_id, api_hash)
+    # connecting and building the session
+    client.connect()
+    # in case of script ran first time it will
+    # ask either to input token or otp sent to
+    # number or sent or your telegram id
+    if not client.is_user_authorized():
+        client.send_code_request(phone)
+        # signing in the client
+        client.sign_in(phone, input('Enter the code: '))
+    try:
+        # receiver user_id and access_hash, use
+        # my user_id and access_hash for reference
+        receiver = InputPeerUser('user_id', 'user_hash')
+        # sending message using telegram client
+        bot_participants=client.get_participants(group_username)
+
+        if len(bot_participants):
+            for x in bot_participants:
+                firstname.append(x.first_name)
+                lastname.append(x.last_name)
+                username.append(x.username)
+    
+       # list to data frame conversion
+        data ={'first_name' :firstname, 'last_name':lastname, 'user_name':username}
+        userdetails = pd.DataFrame(data)
+
+        client.send_message(receiver, message2, parse_mode='html')
+    except Exception as e:
+        # there may be many error coming in while like peer
+        # error, wrong access_hash, flood_error, etc
+        print(e)
+    # disconnecting the telegram session
+    client.disconnect()
 
 #============= SQLITE connection =================
 def create_connection(db_file):
@@ -98,17 +242,17 @@ def fetch_user_usdt_diff(conn, user_id, time_label, diff_type):
     cur = conn.cursor()
     
     if diff_type=='diff_since_start_of_day':
-        sql="""  select a.USDT_balance-b.USDT_balance from 
+        sql="""  select round((a.USDT_balance-b.USDT_balance)/100*a.USDT_balance,4) from 
                     (select USDT_balance from balance where user_id=? and date=date('now') group by user_id having rowid=max(rowid) order by time asc) a,
                     (select USDT_balance from balance where date=date('now') and user_id=? and time_label=?) b
             """
     elif diff_type=='diff_since_last_monday':
-        sql="""  select a.USDT_balance-b.USDT_balance from 
+        sql="""  select round((a.USDT_balance-b.USDT_balance)/100*a.USDT_balance,4) from 
                     (select USDT_balance from balance where user_id=? and date=date('now') group by user_id having rowid=max(rowid) order by time asc) a,
-                    (select USDT_balance from balance where date=date('now','weekday 1') and user_id=? and time_label=?) b
+                    (select USDT_balance from balance where date=date('now','-7 days','weekday 1') and user_id=? and time_label=?) b
             """
     elif diff_type=='diff_since_start_of_month':
-        sql="""  select a.USDT_balance-b.USDT_balance from 
+        sql="""  select round((a.USDT_balance-b.USDT_balance)/100*a.USDT_balance,4) from 
                     (select USDT_balance from balance where user_id=? and date=date('now') group by user_id having rowid=max(rowid) order by time asc) a,
                     (select USDT_balance from balance where date=date('now','start of month') and user_id=? and time_label=?) b
             """
@@ -228,6 +372,13 @@ def get_futures_acc_balance():
 # ================= MAIN =====================
 def main():
     global info_file
+    global user_id
+    global telegram_users
+    global chat_id_1
+    global bot_token
+
+    telegram_users.clear()
+
     user_id='u_'+api_key[-5:]
     loop_status='continue'
     database = r"c:\my_python\python-binance-master\Alex\pythonsqlite.db"
@@ -248,7 +399,10 @@ def main():
         create_table(conn, sql_create_main_table)
     else:
         print("Error! cannot create the database connection.")
-    
+
+    updater = Updater (token=bot_token, use_context=True,)
+    telegram_handler(updater)
+
     while loop_status!='exit_loop':
         total_usdt=0.0
         cur_date=time.strftime('%Y-%m-%d')
@@ -256,7 +410,10 @@ def main():
         time_label=''
 
         info_file=open("info_file.txt",mode="w")
-        
+
+        print(cur_date,cur_time)
+        print(telegram_users)
+
         try: my_margin_acc=client.get_margin_account()
         except BinanceAPIException as e:
             print("API get_margin_account: ",e)
@@ -277,18 +434,28 @@ def main():
         #info_file.write(str(all_tickers_info)+'\n')
         #info_file.write(str(acc_info)+'\n')
 
+        #==========================================
         # get_acc()
         # get_acc_snapshot('SPOT')
         # get_acc_snapshot('MARGIN')
         # get_acc_snapshot('FUTURES')
-        futures_usdt_M=get_futures_USD_M()
-        if futures_usdt_M<0: continue
-        futures_coin_M=get_futures_coin_M()
-        if futures_coin_M<0: continue
+        
+        usr_name='dimay2'
+        if usr_name in telegram_users.keys():
+            chat_id=telegram_users[usr_name]
+            message_text='Hi %s, your chat_id=%d' %(usr_name, chat_id)
+            url_req='https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s' %(bot_token,chat_id,message_text)
+            receive=requests.get(url_req)
 
-        total_usdt += futures_usdt_M
-        total_usdt += futures_coin_M
+        # futures_usdt_M=get_futures_USD_M()
+        # if futures_usdt_M<0: continue
+        # futures_coin_M=get_futures_coin_M()
+        # if futures_coin_M<0: continue
+
+        # total_usdt += futures_usdt_M
+        # total_usdt += futures_coin_M
         # get_futures_acc_balance()
+
 
         with conn:
             time_label='asian_session_start'
@@ -302,13 +469,24 @@ def main():
                 balance_total_futures = (user_id, cur_date, cur_time,'regular_sample','total_futures_usdt',total_usdt)
                 balance_id = add_balance(conn, balance_total_futures)
 
+        # Get LOSS/PROFIT statistics on daily/monthly/weekly basis and check vs. configured thresholds
         usdt_diff_since_start_of_day=fetch_user_usdt_diff(conn,user_id,time_label,'diff_since_start_of_day')
         usdt_diff_since_start_of_month=fetch_user_usdt_diff(conn,user_id,time_label,'diff_since_start_of_month')
         usdt_diff_since_last_monday=fetch_user_usdt_diff(conn,user_id,time_label,'diff_since_last_monday')
+        if usdt_diff_since_start_of_day<usdt_daily_diff_thres:
+            print('!Warning!: usdt_diff_since_start_of_day=%f exceeded LOSS threshold=%f' %(usdt_diff_since_start_of_day,usdt_daily_diff_thres))
+        elif usdt_diff_since_start_of_month<usdt_month_start_diff_thres:
+            print('!Warning!: usdt_diff_since_start_of_month=%f exceeded LOSS threshold=%f' %(usdt_diff_since_start_of_month,usdt_month_start_diff_thres))
+        elif usdt_diff_since_last_monday<usdt_week_start_thres:
+            print('!Warning!: usdt_diff_since_last_monday=%f exceeded LOSS threshold=%f' %(usdt_diff_since_last_monday,usdt_week_start_thres))
+
+        print('usdt_diff_day=%f, usdt_diff_month_start=%f, usdt_diff_last_Mon=%f' %(usdt_diff_since_start_of_day,usdt_diff_since_start_of_month,usdt_diff_since_last_monday))
 
         info_file.close()
-        loop_status='exit_loop'
-        # time.sleep(sample_period)
+        # loop_status='exit_loop'
+        time.sleep(sample_period)
+
+    updater.close()
 
 #======= MAIN execution===========
 if __name__ == "__main__":
