@@ -1,6 +1,13 @@
 {
+	"midnight_session_start":"00:00",
 	"asian_session_start":"02:00",
 	"europe_session_start":"08:00",
 	"us_session_start":"16:00",
-	"update_period":"180"
+	"daily_low_thres":"10",
+	"daily_high_thres":"10",
+	"weekly_low_thres":"-1",
+	"weekly_high_thres":"10",
+	"monthly_low_thres":"-1",
+	"monthly_high_thres":"10",
+	"update_period":"30"
 }
