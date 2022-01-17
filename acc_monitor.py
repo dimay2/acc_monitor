@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from datetime import datetime
 from binance.exceptions import *
@@ -76,11 +78,11 @@ bot_token = '2145626803:AAF3zhXeME5P6oVQiVbxi1VIkhIfdgPFiJU'
 group_username = 'ddd2test_bot'
 
 #======= sync time vs. Binance (must run as admin/root)=========
-os.system('net start w32time')
-os.system('w32tm /resync')
-gt = client.get_server_time()
-tt=time.gmtime(int((gt["serverTime"])/1000))
-win32api.SetSystemTime(tt[0],tt[1],0,tt[2],tt[3],tt[4],tt[5],0)
+# os.system('net start w32time')
+# os.system('w32tm /resync')
+# gt = client.get_server_time()
+# tt=time.gmtime(int((gt["serverTime"])/1000))
+# win32api.SetSystemTime(tt[0],tt[1],0,tt[2],tt[3],tt[4],tt[5],0)
 
 info_file=open("info_file.txt",mode="w")
 
@@ -197,11 +199,17 @@ def fetch_user_balance(conn, user_id, date, time_label):
     return row
 
 #============= SQLITE find start session USDT difference =================
-def fetch_user_perc_diff(conn, user_id, time_label, diff_type):
-    # diff_type = 'diff_since_last_monday' | 'diff_since_start_of_month' | 'diff_since_start_of_day'
+def fetch_user_perc_diff(conn, user_id, time_label, diff_type):     # diff_type = 'diff_since_start_of_day' | 'diff_since_last_monday' | 'diff_since_start_of_month'
+    ret_val=dict()
     cur = conn.cursor()
     
     if diff_type=='diff_since_start_of_day':
+        # sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4),b.USDT_balance,a.USDT_balance from 
+        #             (select USDT_balance from balance where user_id=? and date=date('now','localtime') group by user_id having rowid=max(rowid) order by time asc) a,
+        #             (select USDT_balance from balance where date=date('now','localtime') and user_id=? and time_label=?) b
+        #     """
+        
+        # =================== % loss, initial usdt balance, current usd balance
         sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4),b.USDT_balance,a.USDT_balance from 
                     (select USDT_balance from balance where user_id=? and date=date('now','localtime') group by user_id having rowid=max(rowid) order by time asc) a,
                     (select USDT_balance from balance where date=date('now','localtime') and user_id=? and time_label=?) b
@@ -219,10 +227,14 @@ def fetch_user_perc_diff(conn, user_id, time_label, diff_type):
     cur.execute(sql,(user_id,user_id,time_label))
     row=cur.fetchone()
     if row:
-        perc_balance_diff=float(row[0])
-        return perc_balance_diff
+        # perc_balance_diff=float(row[0])
+        # return perc_balance_diff
+        ret_val['perc_diff']=float(row[0])
+        ret_val['init_usdt_balance']=float(row[1])
+        ret_val['cur_usdt_balance']=float(row[2])
+        return ret_val
     else:
-        return 0.00
+        return -999
 
 #============= get_usdt_rate =============
 # def get_usdt_rate(usdt_pair):
@@ -363,8 +375,11 @@ def update_open_orders_usdt_rates():    # get all orderbook tickers
 
     for i in range(len(futures_open_orders)):   # detect open orders
         if futures_open_orders[i]['status']=='NEW':     # if NEW (open) order detected - add it to the "open_orders_symbols" set
-            open_orders_symbols.add(futures_open_orders[i]['symbol'])
-    info_file.write('\n====open_orders_symbols =%s ======:\n' %(open_orders_symbols))
+            open_orders_symbols.add(futures_open_orders[i]['symbol'])   # add symbols from open orders
+    for i in range(len(futures_USD_M_lst['positions'])):
+        if float(futures_USD_M_lst['positions'][i]['initialMargin'])>0:	#got the open USD_M future position
+            open_orders_symbols.add(futures_USD_M_lst['positions'][i]['symbol'])    # add symbols from open positions
+    info_file.write('\n====open_orders_symbols =%s ======:\n' %(open_orders_symbols))   #open_orders_symbols has symbols both from open positions & open orders
 
     # for i in range(len(orderbook_tickers)):     # go over all orderbook_tickers of futures contracts/symbols prices
     #     if orderbook_tickers[i]['symbol'] in open_orders_symbols:   # if symbol found in open orders - add it to symbol_futures_ticker
@@ -426,7 +441,8 @@ def main():
     # populate users table manually
     # INSERT INTO users(user_id,user_name,exchange_type,api_key,api_secret,status,remarks) VALUES(?,?,?,?,?,?,?)
     loop_status='continue'
-    database = r"c:\my_python\python-binance-master\Alex\pythonsqlite.db"
+    # database = r"c:\my_python\python-binance-master\Alex\pythonsqlite.db"
+    database = r"./pythonsqlite.db"
     # create a database connection
     conn = create_connection(database)
 
@@ -566,22 +582,22 @@ def main():
         
         info_file.write('\nfutures_usdt_M=%f, potential_USD_M_futures_balance=%f, total_potential_PNL_usdt=%f, total_potential_PNL_perc=%f\n' %(futures_usdt_M,potential_USD_M_futures_balance,total_potential_PNL_usdt,total_potential_PNL_perc))
         # Get LOSS/PROFIT statistics on daily/monthly/weekly basis and check vs. configured thresholds
-        perc_diff_since_start_of_day=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_start_of_day')
-        perc_diff_since_start_of_month=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_start_of_month')
-        perc_diff_since_last_monday=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_last_monday')
+        diff_day_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_start_of_day')
+        diff_month_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_start_of_month')
+        diff_monday_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_last_monday')
         
-        if perc_diff_since_start_of_day<daily_low_thres:  # if threshold is reached - cancel all Active orders of logged symbols
-            print('!Warning!: perc_diff_since_start_of_day=%f%% exceeded LOSS threshold=%f%%' %(perc_diff_since_start_of_day,daily_low_thres))
+        if diff_day_start['perc_diff']<daily_low_thres:  # if threshold is reached - cancel all Active orders of logged symbols
+            print('!Warning!: diff_day_start=%f%% exceeded LOSS threshold=%f%%' %(diff_day_start['perc_diff'],daily_low_thres))
             print('symbols to cancel=%s' %open_orders_symbols)
             for symbol in open_orders_symbols:
                 print('cancelling orders with symbol=%s' %symbol)
-            #     try: futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
-            #     except BinanceAPIException as e:
-            #         print("API futures_cancel_all_open_orders: ",e)
-            #         continue
-            #     futures_cancel_all_open_orders=''
-            #     message_str=message_str+('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
-            # print(message_str)
+                try: futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
+                except BinanceAPIException as e:
+                    print("API futures_cancel_all_open_orders: ",e)
+                    continue
+                futures_cancel_all_open_orders=''
+                print('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
+                side='NONE'
                 for i in range(len(futures_USD_M_lst['positions'])):
                     if float(futures_USD_M_lst['positions'][i]['initialMargin'])>0 and futures_USD_M_lst['positions'][i]['symbol']==symbol:
                         if float(futures_USD_M_lst['positions'][i]['notional'])>0: # BUY/LONG
@@ -594,24 +610,26 @@ def main():
                             break
 
                 # create order to cancel the pending Positions
-                try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
-                except BinanceAPIException as e:
-                    print("API futures_create_order: ",e)
-                    continue
-                futures_cancel_all_open_orders=''
-                # message_str=('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
-                info_file.write('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
+                if side!='NONE':
+                    try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
+                    except BinanceAPIException as e:
+                        print("API futures_create_order: ",e)
+                        continue
+                    # futures_cancel_all_open_orders=''
+                    # message_str=('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
+                    info_file.write('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
 
             info_file.write('\n====futures_cancel_all_open_orders for symbols ======:\n'+ str(open_orders_symbols))
             telegram_user_id=116156904
-            message=('!!!WARNING!!!: Your positions and orders are canceled due to LOSS threshold reached.\nLOSS since day start=%f%%, potential USD_M futures balance for now=%fUSDT' %(perc_diff_since_start_of_day,potential_USD_M_futures_balance))
+            message=('!!!WARNING!!!: Your positions and orders are canceled due to LOSS threshold reached. \
+                LOSS since day start=%f%%, USD_M futures balance initial=%fUSDT, potential for now=%fUSDT' %(diff_day_start['perc_diff'],diff_day_start['init_usdt_balance'],potential_USD_M_futures_balance))
             telegram_notifier(telegram_user_id,message)
-        elif perc_diff_since_start_of_month<monthly_low_thres:
-            print('!Warning!: perc_diff_since_start_of_month=%f%% exceeded LOSS threshold=%f%%' %(perc_diff_since_start_of_month,monthly_low_thres))
-        elif perc_diff_since_last_monday<weekly_low_thres:
-            print('!Warning!: perc_diff_since_last_monday=%f%% exceeded LOSS threshold=%f%%' %(perc_diff_since_last_monday,weekly_low_thres))
+        elif diff_month_start['perc_diff']<monthly_low_thres:
+            print('!Warning!: diff_month_start=%f%% exceeded LOSS threshold=%f%%' %(diff_month_start['perc_diff'],monthly_low_thres))
+        elif diff_monday_start['perc_diff']<weekly_low_thres:
+            print('!Warning!: diff_monday_start=%f%% exceeded LOSS threshold=%f%%' %(diff_monday_start['perc_diff'],weekly_low_thres))
 
-        info_file.write('\nusdt_diff_day=%f%%, usdt_diff_month_start=%f%%, usdt_diff_last_Mon=%f%%\n' %(perc_diff_since_start_of_day,perc_diff_since_start_of_month,perc_diff_since_last_monday))
+        info_file.write('\nusdt_diff_day=%f%%, usdt_diff_month_start=%f%%, usdt_diff_last_Mon=%f%%\n' %(diff_day_start,diff_month_start,diff_monday_start))
 
         info_file.close()
         loop_status='exit_loop'
