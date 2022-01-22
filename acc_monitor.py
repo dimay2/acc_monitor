@@ -1,6 +1,6 @@
 #! /opt/acc_monitor/python-env/bin/python
 
-from asyncio.windows_events import NULL
+# from asyncio.windows_events import NULL
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 from datetime import datetime
 from binance.exceptions import *
@@ -331,7 +331,7 @@ def get_futures_USD_M_lst():
         info_file.write('\nAPI futures_account: '+ e)
         return -1
     futures_acc_balance=float(futures_USD_M_lst['totalWalletBalance'])
-    info_file.write('\n====futures_USD_M_lst======:\n'+str(futures_USD_M_lst))
+    # info_file.write('\n====futures_USD_M_lst======:\n'+str(futures_USD_M_lst))
     if futures_acc_balance>0: print('futures_USD_M_lst: futures_acc_balance=%f USD' %(futures_acc_balance))
     return futures_acc_balance
 
@@ -592,7 +592,7 @@ def main():
                 # info_file.write('\n====futures_coin_open_orders======:\n'+str(futures_coin_open_orders))
                 info_file.write('\n====futures_all_orders======:\n'+str(futures_all_orders))
                 # info_file.write('\n====futures_order_book======:\n'+str(futures_order_book))
-                info_file.write('\n====futures_position_information======:\n'+str(futures_position_information))
+                # info_file.write('\n====futures_position_information======:\n'+str(futures_position_information))
                 # info_file.write('\n====futures_coin_position_information======:\n'+str(futures_coin_position_information))
 
                 # info_file.write(str(all_tickers_info)+'\n')
