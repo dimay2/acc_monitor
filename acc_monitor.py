@@ -252,7 +252,8 @@ def fetch_user_perc_diff(conn, user_id, time_label, diff_type):     # diff_type 
         ret_val['cur_usdt_balance']=float(row[2])
         return ret_val
     else:
-        return -999
+        ret_val['perc_diff']=0
+        return ret_val
 
 #============= get_usdt_rate =============
 # def get_usdt_rate(usdt_pair):
