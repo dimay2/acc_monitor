@@ -524,6 +524,7 @@ def main():
                 user_id = user['user_id']
                 api_key = user['api_key']
                 api_secret = user['api_secret']
+                telegram_user_id=user['telegram_user_id']
                 client = Client(api_key, api_secret)
 
                 total_usdt=0.0
@@ -677,9 +678,9 @@ def main():
                             info_file.write('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
 
                     info_file.write('\n====futures_cancel_all_open_orders for symbols ======:\n'+ str(open_orders_symbols))
-                    telegram_user_id=116156904
                     message=('!!!WARNING!!!: User =%s, Your positions and orders are canceled due to LOSS threshold reached. \
                         LOSS since day start=%f%%, USD_M futures balance initial=%fUSDT, potential for now=%fUSDT' %(user_id, diff_day_start['perc_diff'],diff_day_start['init_usdt_balance'],potential_USD_M_futures_balance))
+                    info_file.write('\n!!!WARNING!!! LOSS threshold reached. Notifying telegram!\n')
                     telegram_notifier(telegram_user_id,message)
                 elif diff_month_start['perc_diff']<monthly_low_thres:
                     # print('!Warning!: diff_month_start=%f%% exceeded LOSS threshold=%f%%' %(diff_month_start['perc_diff'],monthly_low_thres))
