@@ -585,10 +585,11 @@ def main():
                     info_file.write('\nsymbols to cancel=%s' %open_orders_symbols)
                     for symbol in open_orders_symbols:
                         info_file.write('\ncancelling orders with symbol=%s' %symbol)
-                        try: info_file.write('\nFAKE futures_cancel_all_open_orders') #futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
-                        except BinanceAPIException as e:
-                            info_file.write('\nAPI futures_cancel_all_open_orders: '+ e)
-                            continue
+                        info_file.write('\nFAKE futures_create_order_CANCEL')
+                        # try: futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
+                        # except BinanceAPIException as e:
+                        #     info_file.write('\nAPI futures_cancel_all_open_orders: '+ e)
+                        #     continue
                         futures_cancel_all_open_orders=''
                         info_file.write('\n!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
                         side='NONE'
@@ -606,10 +607,10 @@ def main():
                         # create order to cancel the pending Positions
                         if side!='NONE':
                             info_file.write('\nFAKE futures_create_order_CANCEL')
-                            try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
-                            except BinanceAPIException as e:
-                                info_file.write('\nAPI futures_create_order: '+ e)
-                                continue
+                            # try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
+                            # except BinanceAPIException as e:
+                            #     info_file.write('\nAPI futures_create_order: '+ e)
+                            #     continue
                             # futures_cancel_all_open_orders=''
                             # message_str=('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
                             info_file.write('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
