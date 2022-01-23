@@ -63,18 +63,6 @@ total_potential_PNL_perc=0.0
 # api_key = '3b1FSIm8ULaiKSxZKHKtabvgwtOk3Oc7k8WiuCvVTlJrcvz0vei7xPi4TyxI5SkF'
 # api_secret = 'TURwiXtFY0ZUxSPbMfXpIzRMfzIpz86JgRbPWWdKuqjbccYWsLYmTyVQ0DfTVNxJ'
 
-# a.mimdu@gmail.com
-# Метка ключа API 2
-# api_key = 'pf3lYR3Sh4A519d4mbrWzEXDTeml17TZhwY4u5DzDcjcdszDNOpKUe9hiQNYUEQc'
-# api_secret = 'BLkXG1GfAcoW7XpzrVSSOehkpoqDyAPz5igfkmM45hpxfrxzDBaPLpTlYgrtJw99'
-
-# a.mimdu@gmail.com
-# Метка ключа API 3
-# api_key = 'gNSkZoP11NeVF3D7krU3FH4mMKDBCtYcL0qnsY2PeqNVsK40xGGUCBlvb2whxpaV'
-# api_secret = 'ixuoQiag9a5tTZdk56eEXq9I3HrkZHnSJyctX6DHrgQfRqq04mhPADqrDAU6MBNL'
-
-# client = Client(NULL, NULL)
-
 user_id=''
 session_start_time=settings_data['midnight_session_start'] #start time in MSK timezone of trade session (Asia/Europe/US)
 sample_period=int(settings_data['update_period']) #sample period in seconds
@@ -129,16 +117,11 @@ def do_start(update: Update, callbackcontext: CallbackContext):
     updater_1=update
     chat_id_1=update.message.chat_id
     telegram_user_name_1=update.message.chat.username
-    # member=update.message.chat.get_member(user_name)
     callbackcontext_1=callbackcontext
     bot_1=callbackcontext_1.bot
-    # chatmember=callbackcontext.bot.getChatMember()
     message_text='your chat_id=%d' %chat_id_1
     telegram_users[telegram_user_name_1]=chat_id_1
-    # callbackcontext.bot.send_message(chat_id=update.message.chat_id, text=message_text)
-    # print(chatmember)
 
-# def do_echo(bot: Bot, update: Update):
 def do_echo(update: Update, callbackcontext: CallbackContext):
     text = update.message.text
     callbackcontext.bot.sendMessage(chat_id=update.message.chat_id, text=text)
@@ -152,15 +135,8 @@ def telegram_handler(updater):
 
     # start_handler=CommandHandler('start', do_start, run_async=True)
     start_handler=CommandHandler('start', do_start)
-    # message_handler_2=MessageHandler(Filters.text, do_echo)
     updater.dispatcher.add_handler(start_handler)
-    # updater.dispatcher.add_handler(message_handler_2)
-
-    # print(updater.bot.get_me())
-    # updater.dispatcher.add_handler(MessageHandler(filters=Filters.all, callback=message_handler))
     updater.start_polling(poll_interval=10)
-    # callbackcontext_1.bot.send_message(chat_id_1, text='DO_START AAAAAAAAAA')
-    # updater.idle()
     return updater
 
 
@@ -176,7 +152,6 @@ def create_connection(db_file):
         conn = sqlite3.connect(db_file)
         return conn
     except Error as e:
-        # print(e)
         info_file.write('\nCannot connect to DB: '+ e)
         exit()
     return conn
@@ -192,7 +167,6 @@ def create_table(conn, create_table_sql):
         c = conn.cursor()
         c.execute(create_table_sql)
     except Error as e:
-        # print(e)
         info_file.write('\nCannot create DB table: '+ e)
         exit()
 #============= SQLITE insert balance data =================
@@ -220,14 +194,9 @@ def fetch_user_balance(conn, user_id, date, time_label):
 def fetch_user_perc_diff(conn, user_id, time_label, diff_type):     # diff_type = 'diff_since_start_of_day' | 'diff_since_last_monday' | 'diff_since_start_of_month'
     ret_val=dict()
     cur = conn.cursor()
-    
+
+    # =================== % loss, initial usdt balance, current usd balance
     if diff_type=='diff_since_start_of_day':
-        # sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4),b.USDT_balance,a.USDT_balance from 
-        #             (select USDT_balance from balance where user_id=? and date=date('now','localtime') group by user_id having rowid=max(rowid) order by time asc) a,
-        #             (select USDT_balance from balance where date=date('now','localtime') and user_id=? and time_label=?) b
-        #     """
-        
-        # =================== % loss, initial usdt balance, current usd balance
         sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4),b.USDT_balance,a.USDT_balance from 
                     (select USDT_balance from balance where user_id=? and date=date('now','localtime') group by user_id having rowid=max(rowid) order by time asc) a,
                     (select USDT_balance from balance where date=date('now','localtime') and user_id=? and time_label=?) b
@@ -245,8 +214,6 @@ def fetch_user_perc_diff(conn, user_id, time_label, diff_type):     # diff_type 
     cur.execute(sql,(user_id,user_id,time_label))
     row=cur.fetchone()
     if row:
-        # perc_balance_diff=float(row[0])
-        # return perc_balance_diff
         ret_val['perc_diff']=float(row[0])
         ret_val['init_usdt_balance']=float(row[1])
         ret_val['cur_usdt_balance']=float(row[2])
@@ -271,7 +238,6 @@ def get_acc():
     total_usdt=0
     try: acc_info = client.get_account(recvWindow=5000)
     except BinanceAPIException as e:
-        # print("API get_account: ",e)
         info_file.write('\nAPI get_account: '+ e)
         return -1
     for i in range(len(acc_info['balances'])):
@@ -282,10 +248,8 @@ def get_acc():
             usdt_rate=get_usdt_rate(usdt_pair)
             usdt_coin_value=float(free)*float(usdt_rate)
             total_usdt+=usdt_coin_value
-            # print('acc_info: coin=%s free=%s usdt_pair=%s usdt_rate=%s usdt_coin_value=%s' %(coin,free,usdt_pair,usdt_rate,usdt_coin_value))
             info_file.write('\nacc_info: coin=%s free=%s usdt_pair=%s usdt_rate=%s usdt_coin_value=%s' %(coin,free,usdt_pair,usdt_rate,usdt_coin_value))
     
-    # print('total_usdt=%f' %(total_usdt))
     info_file.write('\ntotal_usdt=%f' %(total_usdt))
 
 #============= acc_snap_spot_balances =============
@@ -294,7 +258,6 @@ def get_acc_snapshot(type_name):
     total_usdt=0
     try: acc_snap_spot = client.get_account_snapshot(type=type_name,recvWindow=5000)
     except BinanceAPIException as e:
-        # print("API get_account_snapshot_spot: ",e)
         info_file.write('\nAPI get_account_snapshot_spot: '+ e)
         return -1
     if type_name=='SPOT':
@@ -317,7 +280,6 @@ def get_acc_snapshot(type_name):
                 usdt_rate=1
             usdt_coin_value=free*usdt_rate
             total_usdt+=usdt_coin_value
-            # print('acc_snap_spot_balances[%s]: coin=%s free=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%f' %(type_name,coin,free,usdt_pair,usdt_rate,usdt_coin_value))
             info_file.write('\nacc_snap_spot_balances[%s]: coin=%s free=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%f' %(type_name,coin,free,usdt_pair,usdt_rate,usdt_coin_value))
 
     if total_usdt>0: info_file.write('\ntotal_usdt=%f' %(total_usdt)) #print('total_usdt=%f' %(total_usdt))
@@ -328,7 +290,6 @@ def get_futures_USD_M_lst():
     futures_USD_M_lst.clear()
     try: futures_USD_M_lst = client.futures_account()
     except BinanceAPIException as e:
-        # print("API futures_account: ",e)
         info_file.write('\nAPI futures_account: '+ e)
         return -1
     futures_acc_balance=float(futures_USD_M_lst['totalWalletBalance'])
@@ -342,7 +303,6 @@ def get_futures_coin_M():
     total_usdt=0.00
     try: futures_coin_M = client.futures_coin_account()
     except BinanceAPIException as e:
-        # print("API futures_coin_account: ",e)
         info_file.write('\nAPI futures_coin_account: '+ e)
         return -1
     for i in range(len(futures_coin_M['assets'])):
@@ -353,7 +313,6 @@ def get_futures_coin_M():
             usdt_rate=float(get_usdt_rate(usdt_pair))
             usdt_coin_value=walletBalance*usdt_rate
             total_usdt+=float(usdt_coin_value)
-            # print('futures_coin_M: coin=%s walletBalance=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%s' %(coin,walletBalance,usdt_pair,usdt_rate,usdt_coin_value))
             info_file.write('\nfutures_coin_M: coin=%s walletBalance=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%s' %(coin,walletBalance,usdt_pair,usdt_rate,usdt_coin_value))
 
     # info_file.write('\n====futures_coin_M======:\n'+str(futures_coin_M))
@@ -365,7 +324,6 @@ def get_futures_acc_balance():
     futures_acc_balance=[]
     try: futures_acc_balance = client.futures_account_balance()
     except BinanceAPIException as e:
-        # print("API futures_coin_account: ",e)
         info_file.write('\nAPI futures_coin_account: '+ e)
         return -1
     info_file.write('\n====futures_acc_balance======:\n'+str(futures_acc_balance))
@@ -375,7 +333,6 @@ def get_all_open_orders():
     global futures_open_orders
     try: futures_open_orders = client.futures_get_open_orders(recvWindow=5000)
     except BinanceAPIException as e:
-        # print("API futures_get_open_orders: ",e)
         info_file.write('\nAPI futures_get_open_orders: '+ e)
         return -1
     info_file.write('\n====futures_open_orders======:\n'+str(futures_open_orders))
@@ -386,7 +343,6 @@ def futures_orderbook_ticker():
     # get all orderbook tickers
     try: orderbook_tickers=client.futures_orderbook_ticker()
     except BinanceAPIException as e:
-        # print("API futures_orderbook_ticker: ",e)
         info_file.write('\nAPI futures_orderbook_ticker: '+ e)
         return -1
 
@@ -468,7 +424,6 @@ def main():
     futures_coin_M=0.0
     total_potential_PNL_perc = 0.0
 
-    # user_id='u_'+api_key[-5:]
     # populate users table manually
     # INSERT INTO users(user_id,user_name,exchange_type,api_key,api_secret,status,remarks) VALUES(?,?,?,?,?,?,?)
     loop_status='continue'
@@ -504,14 +459,6 @@ def main():
     else:
         print("Error! cannot create the database connection.")
 
-    # updater = Updater (token=bot_token, use_context=True,)
-    # telegram_handler(updater)
-
-    # c = conn.cursor()
-    # c.execute('select * from users')
-    # for r in c.fetchall():
-    #     print(dict(r))
-
     #================ iterate all users in user table =============
     conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
@@ -541,22 +488,18 @@ def main():
 
                 try: my_margin_acc=client.get_margin_account(recvWindow=5000)
                 except BinanceAPIException as e:
-                    # print("API get_margin_account: ",e)
                     info_file.write('\nAPI get_margin_account: '+ e)
                     continue
                 try: balance_BTC = client.get_asset_balance(asset='BTC',recvWindow=5000)
                 except BinanceAPIException as e:
-                    # print("API get_asset_balance: ",e)
                     info_file.write('\nAPI get_asset_balance: '+ e)
                     continue
                 try: asset_details = client.get_asset_details(recvWindow=5000)
                 except BinanceAPIException as e:
-                    # print("API get_asset_details: ",e)
                     info_file.write('\nAPI get_asset_details: '+ e)
                     continue
                 try: exchange_info = client.get_exchange_info()
                 except BinanceAPIException as e:
-                    # print("API get_exchange_info: ",e)
                     info_file.write('\nAPI get_exchange_info: '+ e)
                     continue
                 # try: futures_coin_all_orders = client.futures_coin_get_all_orders()
@@ -569,7 +512,6 @@ def main():
                 #     continue
                 try: futures_all_orders = client.futures_get_all_orders(recvWindow=5000)
                 except BinanceAPIException as e:
-                    # print("API futures_get_all_orders: ",e)
                     info_file.write('\nAPI futures_get_all_orders: '+ e)
                     continue
                 # try: futures_order_book = client.futures_order_book()
@@ -639,20 +581,15 @@ def main():
                 diff_monday_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_last_monday')
                 
                 if diff_day_start['perc_diff']<daily_low_thres:  # if threshold is reached - cancel all Active orders of logged symbols
-                    # print('!Warning!: diff_day_start=%f%% exceeded LOSS threshold=%f%%' %(diff_day_start['perc_diff'],daily_low_thres))
                     info_file.write('\n!Warning!: diff_day_start=%f%% exceeded LOSS threshold=%f%%' %(diff_day_start['perc_diff'],daily_low_thres))
-                    # print('symbols to cancel=%s' %open_orders_symbols)
                     info_file.write('\nsymbols to cancel=%s' %open_orders_symbols)
                     for symbol in open_orders_symbols:
-                        # print('cancelling orders with symbol=%s' %symbol)
                         info_file.write('\ncancelling orders with symbol=%s' %symbol)
                         try: info_file.write('\nFAKE futures_cancel_all_open_orders') #futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
                         except BinanceAPIException as e:
-                            # print("API futures_cancel_all_open_orders: ",e)
                             info_file.write('\nAPI futures_cancel_all_open_orders: '+ e)
                             continue
                         futures_cancel_all_open_orders=''
-                        # print('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
                         info_file.write('\n!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
                         side='NONE'
                         for i in range(len(futures_USD_M_lst['positions'])):
@@ -668,9 +605,9 @@ def main():
 
                         # create order to cancel the pending Positions
                         if side!='NONE':
-                            try: info_file.write('\nFAKE futures_create_order_CANCEL') #futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
+                            info_file.write('\nFAKE futures_create_order_CANCEL')
+                            try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
                             except BinanceAPIException as e:
-                                # print("API futures_create_order: ",e)
                                 info_file.write('\nAPI futures_create_order: '+ e)
                                 continue
                             # futures_cancel_all_open_orders=''
@@ -683,10 +620,8 @@ def main():
                     info_file.write('\n!!!WARNING!!! LOSS threshold reached. Notifying telegram!\n')
                     telegram_notifier(telegram_user_id,message)
                 elif diff_month_start['perc_diff']<monthly_low_thres:
-                    # print('!Warning!: diff_month_start=%f%% exceeded LOSS threshold=%f%%' %(diff_month_start['perc_diff'],monthly_low_thres))
                     info_file.write('\n!Warning!: diff_month_start=%f%% exceeded LOSS threshold=%f%%' %(diff_month_start['perc_diff'],monthly_low_thres))
                 elif diff_monday_start['perc_diff']<weekly_low_thres:
-                    # print('!Warning!: diff_monday_start=%f%% exceeded LOSS threshold=%f%%' %(diff_monday_start['perc_diff'],weekly_low_thres))
                     info_file.write('\n!Warning!: diff_monday_start=%f%% exceeded LOSS threshold=%f%%' %(diff_monday_start['perc_diff'],weekly_low_thres))
 
                 # info_file.write('\nusdt_diff_day=%f%%, usdt_diff_month_start=%f%%, usdt_diff_last_Mon=%f%%\n' %(diff_day_start,diff_month_start,diff_monday_start))
