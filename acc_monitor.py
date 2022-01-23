@@ -233,12 +233,12 @@ def fetch_user_perc_diff(conn, user_id, time_label, diff_type):     # diff_type 
                     (select USDT_balance from balance where date=date('now','localtime') and user_id=? and time_label=?) b
             """
     elif diff_type=='diff_since_last_monday':
-        sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4) from 
+        sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4),b.USDT_balance,a.USDT_balance from 
                     (select USDT_balance from balance where user_id=? and date=date('now','localtime') group by user_id having rowid=max(rowid) order by time asc) a,
                     (select USDT_balance from balance where date=date('now','-7 days','weekday 1') and user_id=? and time_label=?) b
             """
     elif diff_type=='diff_since_start_of_month':
-        sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4) from 
+        sql="""  select round((a.USDT_balance-b.USDT_balance)/b.USDT_balance*100,4),b.USDT_balance,a.USDT_balance from 
                     (select USDT_balance from balance where user_id=? and date=date('now','localtime') group by user_id having rowid=max(rowid) order by time asc) a,
                     (select USDT_balance from balance where date=date('now','start of month') and user_id=? and time_label=?) b
             """
