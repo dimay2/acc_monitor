@@ -464,6 +464,7 @@ def main():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     fetch_users_sql = 'SELECT * FROM users'
+    info_file=open("info_file.txt",mode="a")
 
     while loop_status!='exit_loop':
         for user in c.execute(fetch_users_sql):
@@ -472,15 +473,17 @@ def main():
                 api_key = user['api_key']
                 api_secret = user['api_secret']
                 telegram_user_id=user['telegram_user_id']
-                client = Client(api_key, api_secret)
+
+                try: client = Client(api_key, api_secret)
+                except BinanceAPIException as e:
+                    info_file.write('\nCouldnt register client: '+ e)
+                    continue
 
                 total_usdt=0.0
                 
                 cur_date=time.strftime('%Y-%m-%d')
                 cur_time=time.strftime('%H:%M')
                 time_label=''
-
-                info_file=open("info_file.txt",mode="a")
 
                 print(cur_date,cur_time)
                 info_file.write('\n'+str(now)+'\nuser_id=%s status check' %user['user_id'])
@@ -627,10 +630,10 @@ def main():
 
                 # info_file.write('\nusdt_diff_day=%f%%, usdt_diff_month_start=%f%%, usdt_diff_last_Mon=%f%%\n' %(diff_day_start,diff_month_start,diff_monday_start))
 
-                info_file.close()
                 time.sleep(sample_period)
         # loop_status='exit_loop'
 
+    info_file.close()
     # updater.close()
 
 #======= MAIN execution===========
