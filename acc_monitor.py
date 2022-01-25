@@ -544,7 +544,7 @@ def main():
                 # logging.info('\n====all_orders======:\n'+str(all_orders))
                 # logging.info('\n====futures_coin_all_orders======:\n'+str(futures_coin_all_orders))
                 # logging.info('\n====futures_coin_open_orders======:\n'+str(futures_coin_open_orders))
-                logging.info('\n====futures_all_orders======:\n'+str(futures_all_orders))
+                # logging.info('\n====futures_all_orders======:\n'+str(futures_all_orders))
                 # logging.info('\n====futures_order_book======:\n'+str(futures_order_book))
                 # logging.info('\n====futures_position_information======:\n'+str(futures_position_information))
                 # logging.info('\n====futures_coin_position_information======:\n'+str(futures_coin_position_information))
