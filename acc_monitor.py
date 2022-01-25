@@ -22,6 +22,7 @@ import telebot
 from telethon.sync import TelegramClient
 from telethon.tl.types import InputPeerUser, InputPeerChannel, UpdateFavedStickers
 from telethon import TelegramClient, sync, events
+import logging
 
 from telegram import Update, update
 from telegram import Bot
@@ -86,14 +87,17 @@ group_username = 'ddd2test_bot'
 # tt=time.gmtime(int((gt["serverTime"])/1000))
 # win32api.SetSystemTime(tt[0],tt[1],0,tt[2],tt[3],tt[4],tt[5],0)
 
-info_file=open("info_file.txt",mode="w")
+# info_file=open("info_file.txt",mode="w")
+info_file=open("general.log",mode="w")
+info_file.close()
+logging.basicConfig(filename='general.log', level=logging.INFO)
 
 #======== get SPOT exchange rates =======
 # try: all_tickers_info = client.get_all_tickers()
 # except BinanceAPIException as e:
 #     print("API get_account_snapshot: ",e)
 #     exit()
-# info_file.write('\n====all_tickers_info======:\n'+str(all_tickers_info))
+# logging.info('\n====all_tickers_info======:\n'+str(all_tickers_info))
 # info_file.close()
 
 now = datetime.now()
@@ -103,8 +107,10 @@ def telegram_notifier(telegram_user_id,message):
     # chat_id=telegram_users[usr_name]
     chat_id=telegram_user_id
     url_req='https://api.telegram.org/bot%s/sendMessage?chat_id=%d&text=%s' %(bot_token,chat_id,message)
-    receive=requests.get(url_req)
-
+    try: receive=requests.get(url_req)
+    except requests.exceptions.RequestException as e:
+        logging.info('\nCannot connect to DB: '+ e)
+        raise SystemExit(e)
 
 def do_start(update: Update, callbackcontext: CallbackContext):
     global callbackcontext_1
@@ -152,7 +158,7 @@ def create_connection(db_file):
         conn = sqlite3.connect(db_file)
         return conn
     except Error as e:
-        info_file.write('\nCannot connect to DB: '+ e)
+        logging.info('\nCannot connect to DB: '+ e)
         exit()
     return conn
 
@@ -167,7 +173,7 @@ def create_table(conn, create_table_sql):
         c = conn.cursor()
         c.execute(create_table_sql)
     except Error as e:
-        info_file.write('\nCannot create DB table: '+ e)
+        logging.info('\nCannot create DB table: '+ e)
         exit()
 #============= SQLITE insert balance data =================
 def add_balance(conn, balance_data):
@@ -238,7 +244,7 @@ def get_acc():
     total_usdt=0
     try: acc_info = client.get_account(recvWindow=5000)
     except BinanceAPIException as e:
-        info_file.write('\nAPI get_account: '+ e)
+        logging.info('\nAPI get_account: '+ e)
         return -1
     for i in range(len(acc_info['balances'])):
         coin=acc_info['balances'][i]['asset']
@@ -248,9 +254,9 @@ def get_acc():
             usdt_rate=get_usdt_rate(usdt_pair)
             usdt_coin_value=float(free)*float(usdt_rate)
             total_usdt+=usdt_coin_value
-            info_file.write('\nacc_info: coin=%s free=%s usdt_pair=%s usdt_rate=%s usdt_coin_value=%s' %(coin,free,usdt_pair,usdt_rate,usdt_coin_value))
+            logging.info('\nacc_info: coin=%s free=%s usdt_pair=%s usdt_rate=%s usdt_coin_value=%s' %(coin,free,usdt_pair,usdt_rate,usdt_coin_value))
     
-    info_file.write('\ntotal_usdt=%f' %(total_usdt))
+    logging.info('\ntotal_usdt=%f' %(total_usdt))
 
 #============= acc_snap_spot_balances =============
 def get_acc_snapshot(type_name):
@@ -258,7 +264,7 @@ def get_acc_snapshot(type_name):
     total_usdt=0
     try: acc_snap_spot = client.get_account_snapshot(type=type_name,recvWindow=5000)
     except BinanceAPIException as e:
-        info_file.write('\nAPI get_account_snapshot_spot: '+ e)
+        logging.info('\nAPI get_account_snapshot_spot: '+ e)
         return -1
     if type_name=='SPOT':
         acc_snap_spot_balances=acc_snap_spot['snapshotVos'][0]['data']['balances']
@@ -280,9 +286,9 @@ def get_acc_snapshot(type_name):
                 usdt_rate=1
             usdt_coin_value=free*usdt_rate
             total_usdt+=usdt_coin_value
-            info_file.write('\nacc_snap_spot_balances[%s]: coin=%s free=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%f' %(type_name,coin,free,usdt_pair,usdt_rate,usdt_coin_value))
+            logging.info('\nacc_snap_spot_balances[%s]: coin=%s free=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%f' %(type_name,coin,free,usdt_pair,usdt_rate,usdt_coin_value))
 
-    if total_usdt>0: info_file.write('\ntotal_usdt=%f' %(total_usdt)) #print('total_usdt=%f' %(total_usdt))
+    if total_usdt>0: logging.info('\ntotal_usdt=%f' %(total_usdt)) #print('total_usdt=%f' %(total_usdt))
     return total_usdt
 #============= get futures account =============
 def get_futures_USD_M_lst():
@@ -290,10 +296,10 @@ def get_futures_USD_M_lst():
     futures_USD_M_lst.clear()
     try: futures_USD_M_lst = client.futures_account()
     except BinanceAPIException as e:
-        info_file.write('\nAPI futures_account: '+ e)
+        logging.info('\nAPI futures_account: '+ e)
         return -1
     futures_acc_balance=float(futures_USD_M_lst['totalWalletBalance'])
-    # info_file.write('\n====futures_USD_M_lst======:\n'+str(futures_USD_M_lst))
+    # logging.info('\n====futures_USD_M_lst======:\n'+str(futures_USD_M_lst))
     if futures_acc_balance>0: print('futures_USD_M_lst: futures_acc_balance=%f USD' %(futures_acc_balance))
     return futures_acc_balance
 
@@ -303,7 +309,7 @@ def get_futures_coin_M():
     total_usdt=0.00
     try: futures_coin_M = client.futures_coin_account()
     except BinanceAPIException as e:
-        info_file.write('\nAPI futures_coin_account: '+ e)
+        logging.info('\nAPI futures_coin_account: '+ e)
         return -1
     for i in range(len(futures_coin_M['assets'])):
         coin=futures_coin_M['assets'][i]['asset']
@@ -313,10 +319,10 @@ def get_futures_coin_M():
             usdt_rate=float(get_usdt_rate(usdt_pair))
             usdt_coin_value=walletBalance*usdt_rate
             total_usdt+=float(usdt_coin_value)
-            info_file.write('\nfutures_coin_M: coin=%s walletBalance=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%s' %(coin,walletBalance,usdt_pair,usdt_rate,usdt_coin_value))
+            logging.info('\nfutures_coin_M: coin=%s walletBalance=%f usdt_pair=%s usdt_rate=%f usdt_coin_value=%s' %(coin,walletBalance,usdt_pair,usdt_rate,usdt_coin_value))
 
-    # info_file.write('\n====futures_coin_M======:\n'+str(futures_coin_M))
-    if total_usdt>0: info_file.write('\ntotal_usdt=%f' %(total_usdt)) #print('total_usdt=%f' %(total_usdt))
+    # logging.info('\n====futures_coin_M======:\n'+str(futures_coin_M))
+    if total_usdt>0: logging.info('\ntotal_usdt=%f' %(total_usdt)) #print('total_usdt=%f' %(total_usdt))
     return total_usdt
 
 #============= get futures account balance =============
@@ -324,18 +330,18 @@ def get_futures_acc_balance():
     futures_acc_balance=[]
     try: futures_acc_balance = client.futures_account_balance()
     except BinanceAPIException as e:
-        info_file.write('\nAPI futures_coin_account: '+ e)
+        logging.info('\nAPI futures_coin_account: '+ e)
         return -1
-    info_file.write('\n====futures_acc_balance======:\n'+str(futures_acc_balance))
+    logging.info('\n====futures_acc_balance======:\n'+str(futures_acc_balance))
 
 #============= get all open orders =============
 def get_all_open_orders():
     global futures_open_orders
     try: futures_open_orders = client.futures_get_open_orders(recvWindow=5000)
     except BinanceAPIException as e:
-        info_file.write('\nAPI futures_get_open_orders: '+ e)
+        logging.info('\nAPI futures_get_open_orders: '+ e)
         return -1
-    info_file.write('\n====futures_open_orders======:\n'+str(futures_open_orders))
+    logging.info('\n====futures_open_orders======:\n'+str(futures_open_orders))
 
 #============= get all open orders tickers (USDT rate) =============
 def futures_orderbook_ticker():
@@ -343,7 +349,7 @@ def futures_orderbook_ticker():
     # get all orderbook tickers
     try: orderbook_tickers=client.futures_orderbook_ticker()
     except BinanceAPIException as e:
-        info_file.write('\nAPI futures_orderbook_ticker: '+ e)
+        logging.info('\nAPI futures_orderbook_ticker: '+ e)
         return -1
 
 #============= update open orders rates =============
@@ -365,7 +371,7 @@ def update_open_orders_usdt_rates():    # get all orderbook tickers
     for i in range(len(futures_USD_M_lst['positions'])):
         if float(futures_USD_M_lst['positions'][i]['initialMargin'])>0:	#got the open USD_M future position
             open_orders_symbols.add(futures_USD_M_lst['positions'][i]['symbol'])    # add symbols from open positions
-    info_file.write('\n====open_orders_symbols =%s ======:\n' %(open_orders_symbols))   #open_orders_symbols has symbols both from open positions & open orders
+    logging.info('\n====open_orders_symbols =%s ======:\n' %(open_orders_symbols))   #open_orders_symbols has symbols both from open positions & open orders
 
     # for i in range(len(orderbook_tickers)):     # go over all orderbook_tickers of futures contracts/symbols prices
     #     if orderbook_tickers[i]['symbol'] in open_orders_symbols:   # if symbol found in open orders - add it to symbol_futures_ticker
@@ -376,7 +382,7 @@ def update_open_orders_usdt_rates():    # get all orderbook tickers
             # j=list(order_symbol.split('_'))
             if order_symbol==orderbook_tickers[i]['symbol']:
                 symbol_futures_ticker[order_symbol]=orderbook_tickers[i]['bidPrice']
-    info_file.write('\n====symbol_futures_ticker======:\n'+str(symbol_futures_ticker))
+    logging.info('\n====symbol_futures_ticker======:\n'+str(symbol_futures_ticker))
 
 #============= Calculate all open orders current potential PNL =============
 def calculate_open_orders_total_potential_PNL_usdt():
@@ -401,11 +407,11 @@ def calculate_open_orders_total_potential_PNL_usdt():
                 this_order_potential_PNL_perc=-(currentPrice-entryPrice)/entryPrice*100*leverage
             this_order_potential_PNL_usdt=this_order_potential_PNL_perc*positionInitialMargin/100
             total_potential_PNL_usdt += float(this_order_potential_PNL_usdt)
-            info_file.write('\nsymbol=%s, entryPrice=%f, positionInitialMargin=%f, currentPrice=%f, this_order_potential_PNL_perc=%f, this_order_potential_PNL_usdt=%f, total_potential_PNL_usdt=%f\n' %(symbol,entryPrice,positionInitialMargin,currentPrice, this_order_potential_PNL_perc,this_order_potential_PNL_usdt,total_potential_PNL_usdt))
+            logging.info('\nsymbol=%s, entryPrice=%f, positionInitialMargin=%f, currentPrice=%f, this_order_potential_PNL_perc=%f, this_order_potential_PNL_usdt=%f, total_potential_PNL_usdt=%f\n' %(symbol,entryPrice,positionInitialMargin,currentPrice, this_order_potential_PNL_perc,this_order_potential_PNL_usdt,total_potential_PNL_usdt))
 
 # ================================================ MAIN =====================================================================
 def main():
-    global info_file
+    # global info_file
     global user_id
     global telegram_users
     global chat_id_1
@@ -472,7 +478,11 @@ def main():
                 api_key = user['api_key']
                 api_secret = user['api_secret']
                 telegram_user_id=user['telegram_user_id']
-                client = Client(api_key, api_secret)
+
+                try: client = Client(api_key, api_secret)
+                except BinanceAPIException as e:
+                    logging.info('\nCouldnt register client: '+ e)
+                    continue
 
                 total_usdt=0.0
                 
@@ -480,27 +490,27 @@ def main():
                 cur_time=time.strftime('%H:%M')
                 time_label=''
 
-                info_file=open("info_file.txt",mode="a")
+                # info_file=open("info_file.txt",mode="a")
 
                 print(cur_date,cur_time)
-                info_file.write('\n'+str(now)+'\nuser_id=%s status check' %user['user_id'])
+                logging.info('\n'+str(now)+'\nuser_id=%s status check' %user['user_id'])
                 # print(telegram_users)
 
                 try: my_margin_acc=client.get_margin_account(recvWindow=5000)
                 except BinanceAPIException as e:
-                    info_file.write('\nAPI get_margin_account: '+ e)
+                    logging.info('\nAPI get_margin_account: '+ e)
                     continue
                 try: balance_BTC = client.get_asset_balance(asset='BTC',recvWindow=5000)
                 except BinanceAPIException as e:
-                    info_file.write('\nAPI get_asset_balance: '+ e)
+                    logging.info('\nAPI get_asset_balance: '+ e)
                     continue
                 try: asset_details = client.get_asset_details(recvWindow=5000)
                 except BinanceAPIException as e:
-                    info_file.write('\nAPI get_asset_details: '+ e)
+                    logging.info('\nAPI get_asset_details: '+ e)
                     continue
                 try: exchange_info = client.get_exchange_info()
                 except BinanceAPIException as e:
-                    info_file.write('\nAPI get_exchange_info: '+ e)
+                    logging.info('\nAPI get_exchange_info: '+ e)
                     continue
                 # try: futures_coin_all_orders = client.futures_coin_get_all_orders()
                 # except BinanceAPIException as e:
@@ -512,7 +522,7 @@ def main():
                 #     continue
                 try: futures_all_orders = client.futures_get_all_orders(recvWindow=5000)
                 except BinanceAPIException as e:
-                    info_file.write('\nAPI futures_get_all_orders: '+ e)
+                    logging.info('\nAPI futures_get_all_orders: '+ e)
                     continue
                 # try: futures_order_book = client.futures_order_book()
                 # except BinanceAPIException as e:
@@ -521,7 +531,7 @@ def main():
                 try: futures_position_information = client.futures_position_information(recvWindow=5000)
                 except BinanceAPIException as e:
                     # print("API futures_position_information: ",e)
-                    # info_file.write('\nAPI futures_position_information: '+ e)
+                    # logging.info('\nAPI futures_position_information: '+ e)
                     continue
                 # try: futures_coin_position_information = client.futures_coin_position_information(recvWindow=5000)
                 # except BinanceAPIException as e:
@@ -531,16 +541,16 @@ def main():
                 # except BinanceAPIException as e:
                 #     print("API get_all_orders: ",e)
                 #     continue
-                # info_file.write('\n====all_orders======:\n'+str(all_orders))
-                # info_file.write('\n====futures_coin_all_orders======:\n'+str(futures_coin_all_orders))
-                # info_file.write('\n====futures_coin_open_orders======:\n'+str(futures_coin_open_orders))
-                info_file.write('\n====futures_all_orders======:\n'+str(futures_all_orders))
-                # info_file.write('\n====futures_order_book======:\n'+str(futures_order_book))
-                # info_file.write('\n====futures_position_information======:\n'+str(futures_position_information))
-                # info_file.write('\n====futures_coin_position_information======:\n'+str(futures_coin_position_information))
+                # logging.info('\n====all_orders======:\n'+str(all_orders))
+                # logging.info('\n====futures_coin_all_orders======:\n'+str(futures_coin_all_orders))
+                # logging.info('\n====futures_coin_open_orders======:\n'+str(futures_coin_open_orders))
+                logging.info('\n====futures_all_orders======:\n'+str(futures_all_orders))
+                # logging.info('\n====futures_order_book======:\n'+str(futures_order_book))
+                # logging.info('\n====futures_position_information======:\n'+str(futures_position_information))
+                # logging.info('\n====futures_coin_position_information======:\n'+str(futures_coin_position_information))
 
-                # info_file.write(str(all_tickers_info)+'\n')
-                info_file.write(str(acc_info)+'\n')
+                # logging.info(str(all_tickers_info)+'\n')
+                logging.info(str(acc_info)+'\n')
 
                 #==========================================
                 # get_acc()
@@ -574,24 +584,24 @@ def main():
                         balance_total_futures = (user_id, cur_date, cur_time,'regular_sample','pot_USD_M_fut_bal',potential_USD_M_futures_balance)
                         balance_id = add_balance(conn, balance_total_futures)
                 
-                info_file.write('\nfutures_usdt_M=%f, potential_USD_M_futures_balance=%f, total_potential_PNL_usdt=%f, total_potential_PNL_perc=%f\n' %(futures_usdt_M,potential_USD_M_futures_balance,total_potential_PNL_usdt,total_potential_PNL_perc))
+                logging.info('\nfutures_usdt_M=%f, potential_USD_M_futures_balance=%f, total_potential_PNL_usdt=%f, total_potential_PNL_perc=%f\n' %(futures_usdt_M,potential_USD_M_futures_balance,total_potential_PNL_usdt,total_potential_PNL_perc))
                 # Get LOSS/PROFIT statistics on daily/monthly/weekly basis and check vs. configured thresholds
                 diff_day_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_start_of_day')
                 diff_month_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_start_of_month')
                 diff_monday_start=fetch_user_perc_diff(conn,user_id,time_label,'diff_since_last_monday')
                 
                 if diff_day_start['perc_diff']<daily_low_thres:  # if threshold is reached - cancel all Active orders of logged symbols
-                    info_file.write('\n!Warning!: diff_day_start=%f%% exceeded LOSS threshold=%f%%' %(diff_day_start['perc_diff'],daily_low_thres))
-                    info_file.write('\nsymbols to cancel=%s' %open_orders_symbols)
+                    logging.info('\n!Warning!: diff_day_start=%f%% exceeded LOSS threshold=%f%%' %(diff_day_start['perc_diff'],daily_low_thres))
+                    logging.info('\nsymbols to cancel=%s' %open_orders_symbols)
                     for symbol in open_orders_symbols:
-                        info_file.write('\ncancelling orders with symbol=%s' %symbol)
-                        info_file.write('\nFAKE futures_create_order_CANCEL')
+                        logging.info('\ncancelling orders with symbol=%s' %symbol)
+                        logging.info('\nFAKE futures_create_order_CANCEL')
                         # try: futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
                         # except BinanceAPIException as e:
-                        #     info_file.write('\nAPI futures_cancel_all_open_orders: '+ e)
+                        #     logging.info('\nAPI futures_cancel_all_open_orders: '+ e)
                         #     continue
                         futures_cancel_all_open_orders=''
-                        info_file.write('\n!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
+                        logging.info('\n!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
                         side='NONE'
                         for i in range(len(futures_USD_M_lst['positions'])):
                             if float(futures_USD_M_lst['positions'][i]['initialMargin'])>0 and futures_USD_M_lst['positions'][i]['symbol']==symbol:
@@ -606,29 +616,30 @@ def main():
 
                         # create order to cancel the pending Positions
                         if side!='NONE':
-                            info_file.write('\nFAKE futures_create_order_CANCEL')
+                            logging.info('\nFAKE futures_create_order_CANCEL')
                             # try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
                             # except BinanceAPIException as e:
-                            #     info_file.write('\nAPI futures_create_order: '+ e)
+                            #     logging.info('\nAPI futures_create_order: '+ e)
                             #     continue
                             # futures_cancel_all_open_orders=''
                             # message_str=('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
-                            info_file.write('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
+                            logging.info('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
 
-                    info_file.write('\n====futures_cancel_all_open_orders for symbols ======:\n'+ str(open_orders_symbols))
+                    logging.info('\n====futures_cancel_all_open_orders for symbols ======:\n'+ str(open_orders_symbols))
                     message=('!!!WARNING!!!: User =%s, Your positions and orders are canceled due to LOSS threshold reached. \
                         LOSS since day start=%f%%, USD_M futures balance initial=%fUSDT, potential for now=%fUSDT' %(user_id, diff_day_start['perc_diff'],diff_day_start['init_usdt_balance'],potential_USD_M_futures_balance))
-                    info_file.write('\n!!!WARNING!!! LOSS threshold reached. Notifying telegram!\n')
+                    logging.info('\n!!!WARNING!!! LOSS threshold reached. Notifying telegram!\n')
                     telegram_notifier(telegram_user_id,message)
                 elif diff_month_start['perc_diff']<monthly_low_thres:
-                    info_file.write('\n!Warning!: diff_month_start=%f%% exceeded LOSS threshold=%f%%' %(diff_month_start['perc_diff'],monthly_low_thres))
+                    logging.info('\n!Warning!: diff_month_start=%f%% exceeded LOSS threshold=%f%%' %(diff_month_start['perc_diff'],monthly_low_thres))
                 elif diff_monday_start['perc_diff']<weekly_low_thres:
-                    info_file.write('\n!Warning!: diff_monday_start=%f%% exceeded LOSS threshold=%f%%' %(diff_monday_start['perc_diff'],weekly_low_thres))
+                    logging.info('\n!Warning!: diff_monday_start=%f%% exceeded LOSS threshold=%f%%' %(diff_monday_start['perc_diff'],weekly_low_thres))
+                time.sleep(5)  # sleep timer between single users monitoring
 
-                # info_file.write('\nusdt_diff_day=%f%%, usdt_diff_month_start=%f%%, usdt_diff_last_Mon=%f%%\n' %(diff_day_start,diff_month_start,diff_monday_start))
+                # logging.info('\nusdt_diff_day=%f%%, usdt_diff_month_start=%f%%, usdt_diff_last_Mon=%f%%\n' %(diff_day_start,diff_month_start,diff_monday_start))
 
-                info_file.close()
-                time.sleep(sample_period)
+                # info_file.close()
+        time.sleep(sample_period) # sleep timer between bulks (user groups) monitoring
         # loop_status='exit_loop'
 
     # updater.close()
