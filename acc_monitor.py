@@ -595,13 +595,12 @@ def main():
                     logging.info('\nsymbols to cancel=%s' %open_orders_symbols)
                     for symbol in open_orders_symbols:
                         logging.info('\ncancelling orders with symbol=%s' %symbol)
-                        logging.info('\nFAKE futures_create_order_CANCEL')
-                        # try: futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
-                        # except BinanceAPIException as e:
-                        #     logging.info('\nAPI futures_cancel_all_open_orders: '+ e)
-                        #     continue
-                        futures_cancel_all_open_orders=''
-                        logging.info('\n!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
+                        # logging.info('\nFAKE futures_create_order_CANCEL')
+                        try: futures_cancel_all_open_orders = client.futures_cancel_all_open_orders(symbol=symbol,recvWindow=5000)
+                        except BinanceAPIException as e:
+                            logging.info('\nAPI futures_cancel_all_open_orders: '+ e)
+                            continue
+                        logging.info('\n!Warning!: All open orders canceled %s' %(futures_cancel_all_open_orders))
                         side='NONE'
                         for i in range(len(futures_USD_M_lst['positions'])):
                             if float(futures_USD_M_lst['positions'][i]['initialMargin'])>0 and futures_USD_M_lst['positions'][i]['symbol']==symbol:
@@ -616,14 +615,12 @@ def main():
 
                         # create order to cancel the pending Positions
                         if side!='NONE':
-                            logging.info('\nFAKE futures_create_order_CANCEL')
-                            # try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
-                            # except BinanceAPIException as e:
-                            #     logging.info('\nAPI futures_create_order: '+ e)
-                            #     continue
-                            # futures_cancel_all_open_orders=''
-                            # message_str=('!Warning!: All orders canceled %s' %(futures_cancel_all_open_orders))
-                            logging.info('\n====futures_create_order_CANCEL ======:\n%s' %(futures_create_order_CANCEL))
+                            # logging.info('\nFAKE futures_create_order_CANCEL')
+                            try: futures_create_order_CANCEL = client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=quantity, recvWindow=5000)
+                            except BinanceAPIException as e:
+                                logging.info('\nAPI futures_create_order: '+ e)
+                                continue
+                            logging.info('\n====futures_create_order_CANCEL for pending positions ======:\n%s' %(futures_create_order_CANCEL))
 
                     logging.info('\n====futures_cancel_all_open_orders for symbols ======:\n'+ str(open_orders_symbols))
                     message=('!!!WARNING!!!: User =%s, Your positions and orders are canceled due to LOSS threshold reached. \
