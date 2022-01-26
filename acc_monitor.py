@@ -366,7 +366,7 @@ def update_open_orders_usdt_rates():    # get all orderbook tickers
     futures_orderbook_ticker() # update all future orders USDT rate
 
     for i in range(len(futures_open_orders)):   # detect open orders
-        if futures_open_orders[i][' ']=='NEW':     # if NEW (open) order detected - add it to the "open_orders_symbols" set
+        if futures_open_orders[i]['status']=='NEW':     # if NEW (open) order detected - add it to the "open_orders_symbols" set
             open_orders_symbols.add(futures_open_orders[i]['symbol'])   # add symbols from open orders
     for i in range(len(futures_USD_M_lst['positions'])):
         if float(futures_USD_M_lst['positions'][i]['initialMargin'])>0:	#got the open USD_M future position
