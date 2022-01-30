@@ -6,5 +6,5 @@ if [ $proc_count == 1 ];then
 	echo "acc_monitor.py is running" >> /opt/acc_monitor/process_monitor.log
 else 
 	echo "acc_monitor.py is NOT running. restarting process" >> /opt/acc_monitor/process_monitor.log
-	nohup /opt/acc_monitor/acc_monitor.py &
+	cd /opt/acc_monitor; nohup ./acc_monitor.py &
 fi
